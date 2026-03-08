@@ -1,0 +1,35 @@
+{
+  "name": "@hushbid/contracts",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "description": "HushBid Protocol smart contracts",
+  "scripts": {
+    "compile": "hardhat compile",
+    "postcompile": "npm run extract-abis",
+    "extract-abis": "npx tsx scripts/extract-abis.ts",
+    "test": "hardhat test",
+    "clean": "hardhat clean",
+    "deploy": "hardhat run scripts/deploy.ts",
+    "deploy:sepolia": "hardhat run scripts/deploy.ts --network sepolia",
+    "register-tokens": "hardhat run scripts/register-tokens.ts --network sepolia"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-ignition": "^3.0.7",
+    "@nomicfoundation/hardhat-toolbox-viem": "^5.0.2",
+    "@types/node": "^22.19.11",
+    "dotenv": "^16.3.1",
+    "ethers": "^6.10.0",
+    "forge-std": "github:foundry-rs/forge-std#v1.9.4",
+    "hardhat": "^3.1.8",
+    "ts-node": "^10.9.2",
+    "typescript": "~5.8.0",
+    "viem": "^2.45.3"
+  },
+  "dependencies": {
+    "@chainlink/ace": "^1.0.0",
+    "@chainlink/contracts": "^1.1.0",
+    "@openzeppelin/contracts": "^5.0.1",
+    "@openzeppelin/contracts-upgradeable": "^5.6.1"
+  }
+}

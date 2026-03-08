@@ -1,0 +1,30 @@
+{
+  "schedule": "* * * * *",
+  "primaryChain": {
+    "chainSelectorName": "base-mainnet",
+    "auctionContract": "0x0000000000000000000000000000000000000000",
+    "priceNormalizer": "0x0000000000000000000000000000000000000000",
+    "creCoordinator": "0x0000000000000000000000000000000000000000",
+    "gasLimit": "500000"
+  },
+  "supportedChains": [
+    {
+      "chainSelectorName": "ethereum-mainnet",
+      "bidReceiverContract": "0x0000000000000000000000000000000000000000"
+    },
+    {
+      "chainSelectorName": "ethereum-mainnet-arbitrum-1",
+      "bidReceiverContract": "0x0000000000000000000000000000000000000000"
+    }
+  ],
+  "tokens": {
+    "eth": "0x0000000000000000000000000000000000000000",
+    "weth": "0x4200000000000000000000000000000000000006",
+    "usdc": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+  },
+  "secrets": {
+    "donEthPrivateKey": "${DON_ETH_PRIVATE_KEY}",
+    "donWalletAddress": "${DON_WALLET_ADDRESS}",
+    "donEncryptionPrivateKey": "${DON_ENCRYPTION_PRIVATE_KEY}"
+  }
+}

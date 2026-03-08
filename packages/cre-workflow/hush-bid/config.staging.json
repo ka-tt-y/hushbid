@@ -1,0 +1,26 @@
+{
+  "schedule": "* * * * *",
+  "primaryChain": {
+    "chainSelectorName": "ethereum-testnet-sepolia",
+    "auctionContract": "0x7fe88e9bc38085d53a11d7d311b0c48ce511efd3",
+    "priceNormalizer": "0x06189b1b27ae995439eb0ec9f232d511cce38ff2",
+    "creCoordinator": "0xf4c38aF1cecdb2A85d2b25E1278993e8ae04C8DA",
+    "gasLimit": "500000"
+  },
+  "convergence": {
+    "apiEndpoint": "https://convergence2026-token-api.cldev.cloud",
+    "vaultContract": "0xE588a6c73933BFD66Af9b4A07d48bcE59c0D2d13",
+    "chainId": 11155111
+  },
+  "tokens": {
+    "eth": "0x0000000000000000000000000000000000000000",
+    "weth": "0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9",
+    "usdc": "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"
+  },
+  "secrets": {
+    "donEthPrivateKey": "REDACTED_DON_ETH_PRIVATE_KEY",
+    "donWalletAddress": "0xf4c38aF1cecdb2A85d2b25E1278993e8ae04C8DA",
+    "donEncryptionPrivateKey": "REDACTED_DON_ENCRYPTION_KEY",
+    "pinataJwt": "REDACTED_PINATA_JWT"
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "name": "hushbid-protocol",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Private Price Discovery Engine for On-Chain Assets",
+  "workspaces": [
+    "packages/contracts",
+    "packages/sdk",
+    "packages/cre-workflow",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces",
+    "compile": "npm run compile --workspace=@hushbid/contracts",
+    "dev:demo": "npm run dev --workspace=demo",
+    "agent": "node scripts/cre-agent.mjs",
+    "agent:dry": "node scripts/cre-agent.mjs --dry-run --verbose",
+    "agent:broadcast": "node scripts/cre-agent.mjs --broadcast",
+    "agent:verbose": "node scripts/cre-agent.mjs --broadcast --verbose",
+    "deploy:sepolia": "npm run deploy:sepolia --workspace=@hushbid/contracts"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
