@@ -9,7 +9,8 @@ const HUSH_BID_ABI = [
   { type: 'function', name: 'getBidCommitmentFull', inputs: [{ name: 'auctionId', type: 'uint256' }, { name: 'index', type: 'uint256' }], outputs: [{ type: 'tuple', components: [{ name: 'commitHash', type: 'bytes32' }, { name: 'ipfsCid', type: 'string' }, { name: 'timestamp', type: 'uint64' }, { name: 'sourceChain', type: 'uint64' }, { name: 'valid', type: 'bool' }] }], stateMutability: 'view' },
 ];
 
-const RPC = 'https://eth-sepolia.g.alchemy.com/v2/YOUR_ALCHEMY_KEY';
+const RPC = process.env.SEPOLIA_RPC_URL;
+if (!RPC) throw new Error('SEPOLIA_RPC_URL env var is required');
 const CONTRACT = '0xc3c083dd53179a9e95d1c096527dbe5302a0f354';
 
 async function main() {

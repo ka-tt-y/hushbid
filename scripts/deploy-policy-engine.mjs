@@ -19,7 +19,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // --- Config ---
 const PRIVATE_KEY = process.env.DON_ETH_PRIVATE_KEY;
 if (!PRIVATE_KEY) throw new Error('DON_ETH_PRIVATE_KEY env var is required');
-const RPC_URL = 'https://eth-sepolia.g.alchemy.com/v2/YOUR_ALCHEMY_KEY';
+const RPC_URL = process.env.SEPOLIA_RPC_URL;
+if (!RPC_URL) throw new Error('SEPOLIA_RPC_URL env var is required');
 const WETH_ADDRESS = '0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9';
 const VAULT_ADDRESS = '0xE588a6c73933BFD66Af9b4A07d48bcE59c0D2d13';
 // PolicyEngine implementation already deployed on Sepolia (read from USDC's proxy)

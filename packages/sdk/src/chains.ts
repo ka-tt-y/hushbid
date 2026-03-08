@@ -10,7 +10,7 @@ export const CHAIN_CONFIGS: Record<SupportedChain, ChainConfig> = {
   sepolia: {
     name: "Ethereum Sepolia",
     chainId: 11155111,
-    rpcUrl: "https://eth-sepolia.g.alchemy.com/v2/YOUR_ALCHEMY_KEY",
+    rpcUrl: process.env.SEPOLIA_RPC_URL || "https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY_HERE",
     isPrimary: true,
     contracts: {
       hushBid: "0xf842c9a06e99f2b9fffa9d8ca10c42d7c3fc85d6",

@@ -96,7 +96,8 @@ if (!process.env.DON_WALLET_ADDRESS) {
   process.env.DON_WALLET_ADDRESS = acct.address;
 }
 
-const RPC_URL = process.env.SEPOLIA_RPC_URL || process.env.RPC_URL_SEPOLIA || 'https://eth-sepolia.g.alchemy.com/v2/YOUR_ALCHEMY_KEY';
+const RPC_URL = process.env.SEPOLIA_RPC_URL || process.env.RPC_URL_SEPOLIA;
+if (!RPC_URL) throw new Error('SEPOLIA_RPC_URL env var is required');
 const CONTRACT = (process.env.HUSH_BID_ADDRESS || '0xf842c9a06e99f2b9fffa9d8ca10c42d7c3fc85d6').toLowerCase();
 // Also load demo .env for PINATA_JWT
 const DEMO_ENV_PATH = pathResolve(PROJECT_ROOT, 'apps/demo/.env');

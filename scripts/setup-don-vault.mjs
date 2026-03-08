@@ -7,7 +7,8 @@ import { createPublicClient, createWalletClient, http, parseEther, formatEther }
 import { sepolia } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 
-const RPC = 'https://eth-sepolia.g.alchemy.com/v2/YOUR_ALCHEMY_KEY';
+const RPC = process.env.SEPOLIA_RPC_URL;
+if (!RPC) throw new Error('SEPOLIA_RPC_URL env var is required');
 const WETH = '0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9';
 const VAULT = '0xE588a6c73933BFD66Af9b4A07d48bcE59c0D2d13';
 const API = 'https://convergence2026-token-api.cldev.cloud';
