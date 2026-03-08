@@ -14,7 +14,6 @@ import { type Address } from 'viem';
 export interface ContractAddresses {
   hushBid: Address;
   priceNormalizer: Address;
-  mockNFT: Address;
 }
 
 export interface ChainlinkAddresses {
@@ -22,9 +21,6 @@ export interface ChainlinkAddresses {
   priceFeedEthUsd: Address;
   priceFeedUsdcUsd: Address;
   priceFeedDaiUsd: Address;
-
-  // World ID v4
-  worldIdVerifier: Address;
 }
 
 export interface TokenAddresses {
@@ -50,7 +46,6 @@ export function getContractAddresses(): ContractAddresses {
   return {
     hushBid: (import.meta.env.VITE_HUSH_BID_ADDRESS || ZERO_ADDRESS) as Address,
     priceNormalizer: (import.meta.env.VITE_PRICE_NORMALIZER_ADDRESS || ZERO_ADDRESS) as Address,
-    mockNFT: (import.meta.env.VITE_MOCK_NFT_ADDRESS || ZERO_ADDRESS) as Address,
   };
 }
 
@@ -63,9 +58,6 @@ export function getChainlinkAddresses(): ChainlinkAddresses {
     priceFeedEthUsd: (import.meta.env.VITE_PRICE_FEED_ETH_USD || '0x694AA1769357215DE4FAC081bf1f309aDC325306') as Address,
     priceFeedUsdcUsd: (import.meta.env.VITE_PRICE_FEED_USDC_USD || '0xA2F78ab2355fe2f984D808B5CeE7FD0A93D5270E') as Address,
     priceFeedDaiUsd: (import.meta.env.VITE_PRICE_FEED_DAI_USD || '0x14866185B1962B63C3Ea9E03Bc1da838bab34C19') as Address,
-
-    // World ID v4 Verifier (set via env once deployed)
-    worldIdVerifier: (import.meta.env.VITE_WORLD_ID_VERIFIER || ZERO_ADDRESS) as Address,
   };
 }
 

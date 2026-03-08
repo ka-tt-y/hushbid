@@ -40,8 +40,6 @@ const convergenceAddresses = getConvergenceAddresses();
 export const CONTRACTS = {
   [ACTIVE_CHAIN_ID]: {
     hushBid: contractAddresses.hushBid,
-    priceNormalizer: contractAddresses.priceNormalizer,
-    mockNFT: contractAddresses.mockNFT,
     convergenceVault: convergenceAddresses.vault,
   },
 } as const;
@@ -54,10 +52,9 @@ export const PRICE_FEEDS = {
   },
 } as const;
 
-// World ID v4 configuration (client-side only — signing key stays on server)
+// World ID configuration (IDKit v2 — no server-side signing needed)
 export const WORLD_ID = {
-  appId: import.meta.env.VITE_WORLD_ID_APP_ID || 'app_9bf7f49b1cf8a9e6c0a90873574d9303',
+  appId: import.meta.env.VITE_WORLD_ID_APP_ID || 'app_staging_7550bf79ac49e634e4eb502b94788a24',
   actionId: 'bid-verification',
-  rpId: import.meta.env.VITE_WORLD_ID_RP_ID || 'rp_0fad302d2bcdf0ef',
 };
 

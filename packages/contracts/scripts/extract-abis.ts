@@ -20,9 +20,6 @@ const OUTPUT_DIR = join(dirname(import.meta.dirname ?? __dirname), 'abi');
 const CONTRACTS = [
   { file: 'HushBid.sol/HushBid.json', name: 'HushBid' },
   { file: 'PriceNormalizer.sol/PriceNormalizer.json', name: 'PriceNormalizer' },
-  { file: 'CrossChainBidReceiver.sol/CrossChainBidReceiver.json', name: 'CrossChainBidReceiver' },
-  { file: 'CrossChainBidSender.sol/CrossChainBidSender.json', name: 'CrossChainBidSender' },
-  { file: 'MockNFT.sol/MockNFT.json', name: 'MockNFT' },
   { file: 'interfaces/IAuctionTypes.sol/IAuctionTypes.json', name: 'IAuctionTypes' },
 ];
 

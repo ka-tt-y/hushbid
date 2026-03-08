@@ -991,6 +991,108 @@ function signDigest(privKey: Uint8Array, digest: `0x${string}`): string {
 }
 
 /**
+ * Query the DON wallet's vault balance for a specific token.
+ *
+ * Signs a "Retrieve Balances" EIP-712 request with the DON key and
+ * POSTs to the Convergence /balances endpoint via ConfidentialHTTPClient.
+ *
+ * Returns the balance as a bigint, or 0n if the query fails.
+ */
+function queryDonVaultBalance(
+  runtime: Runtime<Config>,
+  donAddress: Address,
+  token: Address,
+): bigint {
+  const { convergence } = runtime.config
+  const confidentialHttp = new ConfidentialHTTPClient()
+
+  const timestamp = Math.floor(runtime.now().getTime() / 1000)
+
+  // Sign "Retrieve Balances" EIP-712 message
+  const donPrivKeyHex = readSecret(runtime, 'DON_ETH_PRIVATE_KEY')
+
+  const domainSeparator = keccak256(
+    encodeAbiParameters(
+      [
+        { type: 'bytes32' },
+        { type: 'bytes32' },
+        { type: 'bytes32' },
+        { type: 'uint256' },
+        { type: 'address' },
+      ],
+      [
+        keccak256(toBytes('EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)')),
+        keccak256(toBytes(CONVERGENCE_EIP712_DOMAIN.name)),
+        keccak256(toBytes(CONVERGENCE_EIP712_DOMAIN.version)),
+        BigInt(convergence.chainId),
+        convergence.vaultContract as Address,
+      ]
+    )
+  )
+
+  const structHash = keccak256(
+    encodeAbiParameters(
+      [
+        { type: 'bytes32' },
+        { type: 'address' },
+        { type: 'uint256' },
+      ],
+      [
+        keccak256(toBytes('Retrieve Balances(address account,uint256 timestamp)')),
+        donAddress,
+        BigInt(timestamp),
+      ]
+    )
+  )
+
+  const digest = keccak256(
+    encodePacked(
+      ['bytes2', 'bytes32', 'bytes32'],
+      ['0x1901', domainSeparator, structHash]
+    )
+  )
+
+  const privKeyBytes = hexToUint8Array(donPrivKeyHex)
+  const signature = signDigest(privKeyBytes, digest)
+
+  try {
+    const resp = confidentialHttp.sendRequest(
+      runtime,
+      {
+        request: {
+          url: `${convergence.apiEndpoint}/balances`,
+          method: 'POST',
+          multiHeaders: {
+            'Content-Type': { values: ['application/json'] },
+          },
+          bodyString: JSON.stringify({
+            account: donAddress,
+            timestamp,
+            auth: signature,
+          }),
+        },
+      },
+    ).result()
+
+    if (resp.statusCode !== 200) {
+      const body = new TextDecoder().decode(resp.body)
+      runtime.log(`⚠️ Vault balance query failed (${resp.statusCode}): ${body}`)
+      return 0n
+    }
+
+    const text = new TextDecoder().decode(resp.body)
+    const data = JSON.parse(text) as { balances: Array<{ token: string; amount: string }> }
+    const entry = data.balances.find(
+      (b) => b.token.toLowerCase() === token.toLowerCase()
+    )
+    return entry ? BigInt(entry.amount) : 0n
+  } catch (err) {
+    runtime.log(`⚠️ Vault balance query error: ${err}`)
+    return 0n
+  }
+}
+
+/**
  * Execute a private transfer via the Convergence Token API.
  *
  * Uses ConfidentialHTTPClient to POST to the /private-transfer endpoint
@@ -1079,8 +1181,50 @@ const settlePrivatePayments = (
     `Settling private payments for auction — ${bids.length} bids, winner index=${winnerIndex}`
   )
 
-  // ── Step 1: Pay the seller ──────────────────────────────────────────
+  // ── Pre-check: Verify DON wallet vault balance ──────────────────────
+  // Bidders should have privately transferred their bid amounts to the DON
+  // wallet at bid time (step 5 in BidModal). If those transfers failed or
+  // never happened, the DON can't pay the seller.
   const winnerBid = bids[winnerIndex]
+
+  // Calculate total outflows needed: winner's bid (to seller) + all loser
+  // refunds (back to each loser). Group by token.
+  const requiredByToken = new Map<string, bigint>()
+  for (const bid of bids) {
+    const tokenKey = bid.paymentToken.toLowerCase()
+    const prev = requiredByToken.get(tokenKey) ?? 0n
+    requiredByToken.set(tokenKey, prev + BigInt(bid.amount))
+  }
+  // Also need the auctioned asset to deliver to the winner
+  const assetKey = auction.assetContract.toLowerCase()
+  const prevAsset = requiredByToken.get(assetKey) ?? 0n
+  requiredByToken.set(assetKey, prevAsset + BigInt(auction.tokenAmount))
+
+  // Query and log DON vault balance for each needed token
+  let balanceSufficient = true
+  for (const [tokenAddr, required] of requiredByToken) {
+    const balance = queryDonVaultBalance(runtime, donAddress, tokenAddr as Address)
+    runtime.log(
+      `💰 DON vault balance for ${tokenAddr}: ${balance.toString()} (need ${required.toString()})`
+    )
+    if (balance < required) {
+      runtime.log(
+        `❌ Insufficient DON vault balance for ${tokenAddr}: have ${balance.toString()}, need ${required.toString()}. ` +
+        `This means bidder→DON private transfers failed at bid time, or the seller didn't deposit the auctioned asset.`
+      )
+      balanceSufficient = false
+    }
+  }
+
+  if (!balanceSufficient) {
+    throw new Error(
+      `DON wallet (${donAddress}) has insufficient vault balance for private payments. ` +
+      `Bidders must deposit into the vault AND privately transfer to the DON wallet when placing bids. ` +
+      `Check that bid submissions completed all 5 vault pipeline steps.`
+    )
+  }
+
+  // ── Step 1: Pay the seller ──────────────────────────────────────────
   if (auction.sellerShieldedAddress === zeroAddress) {
     throw new Error(
       'Auction has no seller shielded address — cannot process private payment. ' +

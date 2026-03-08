@@ -2,8 +2,8 @@
   "schedule": "* * * * *",
   "primaryChain": {
     "chainSelectorName": "ethereum-testnet-sepolia",
-    "auctionContract": "0x7fe88e9bc38085d53a11d7d311b0c48ce511efd3",
-    "priceNormalizer": "0x06189b1b27ae995439eb0ec9f232d511cce38ff2",
+    "auctionContract": "0xf842c9a06e99f2b9fffa9d8ca10c42d7c3fc85d6",
+    "priceNormalizer": "0x4c43a1fa71d29c7c1464feea1143a0f8a74c92be",
     "creCoordinator": "0xf4c38aF1cecdb2A85d2b25E1278993e8ae04C8DA",
     "gasLimit": "500000"
   },
@@ -18,9 +18,9 @@
     "usdc": "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"
   },
   "secrets": {
-    "donEthPrivateKey": "REDACTED_DON_ETH_PRIVATE_KEY",
-    "donWalletAddress": "0xf4c38aF1cecdb2A85d2b25E1278993e8ae04C8DA",
-    "donEncryptionPrivateKey": "REDACTED_DON_ENCRYPTION_KEY",
-    "pinataJwt": "REDACTED_PINATA_JWT"
+    "donEthPrivateKey": "${DON_ETH_PRIVATE_KEY}",
+    "donWalletAddress": "${DON_WALLET_ADDRESS}",
+    "donEncryptionPrivateKey": "${DON_ENCRYPTION_PRIVATE_KEY}",
+    "pinataJwt": "${PINATA_JWT}"
   }
 }

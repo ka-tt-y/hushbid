@@ -7,11 +7,9 @@
 export {
   HushBidClient,
   HUSH_BID_ABI,
-  PRICE_NORMALIZER_ABI,
   // CRE / Confidential HTTP
   isCreConfigured,
   submitBidToCre,
-  getAuctionFromCre,
   encryptForDon,
   type BidSubmission,
   type BidSubmissionResponse,
@@ -56,9 +54,6 @@ export {
   isNativeToken,
   getAllTokenSymbols,
 } from "./tokens";
-
-// Action helpers
-export { prepareBid, computeAllowedTokensHash } from "./actions";
 
 // Convergence Token API (private payments)
 export {

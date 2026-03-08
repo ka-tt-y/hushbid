@@ -148,13 +148,19 @@ export function UserDashboard() {
   ): Promise<string> => {
     if (!address) throw new Error('Not connected');
     try {
-      // Convert WorldIdProof → SDK WorldIdProof for the contract
-      // SDK type: { root: bigint, nullifierHash: bigint, proof: [bigint × 8] }
+      // Convert WorldIdProof → SDK WorldIdProof for the contract.
+      // Device proofs are verified off-chain via the World ID cloud API
+      // (see WorldIdVerify.tsx handleVerify). On-chain we pass root=0 to
+      // skip the WorldIDRouter.verifyProof call (which only supports Orb).
+      // Orb proofs pass the real root for full on-chain verification.
+      const isOrbProof = proof?.verification_level === 'orb';
       const worldIdProof = proof
         ? {
-            root: BigInt(proof.merkle_root),
+            root: isOrbProof ? BigInt(proof.merkle_root) : 0n,
             nullifierHash: BigInt(proof.nullifier_hash),
-            proof: decodeWorldIdProof(proof.proof),
+            proof: isOrbProof
+              ? decodeWorldIdProof(proof.proof)
+              : [0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n] as [bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint],
           }
         : undefined;
 

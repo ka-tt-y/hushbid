@@ -12,7 +12,7 @@ import "dotenv/config";
  */
 
 const AUCTION_CONTRACT = getAddress(
-  process.env.AUCTION_CONTRACT || "0x7fe88e9bc38085d53a11d7d311b0c48ce511efd3"
+  process.env.AUCTION_CONTRACT || "0xf842c9a06e99f2b9fffa9d8ca10c42d7c3fc85d6"
 );
 
 async function main() {

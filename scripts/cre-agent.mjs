@@ -30,7 +30,7 @@ import { sepolia } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 import { spawn } from 'node:child_process';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { resolve as pathResolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -38,12 +38,27 @@ import { fileURLToPath } from 'node:url';
 // ═══════════════════════════════════════════════════════════════════════════
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const PROJECT_ROOT = resolve(__dirname, '..');
-const CRE_WORKFLOW_DIR = resolve(PROJECT_ROOT, 'packages/cre-workflow');
-const STATE_FILE = resolve(PROJECT_ROOT, '.cre-agent-state.json');
+const PROJECT_ROOT = pathResolve(__dirname, '..');
+const CRE_WORKFLOW_DIR = pathResolve(PROJECT_ROOT, 'packages/cre-workflow');
+const STATE_FILE = pathResolve(PROJECT_ROOT, '.cre-agent-state.json');
 
-// ── Auto-load secrets from packages/contracts/.env ──────────────────────
-const CONTRACTS_ENV_PATH = resolve(PROJECT_ROOT, 'packages/contracts/.env');
+// ── Load CRE workflow .env FIRST — this has the real DON key ────────────
+const CRE_ENV_PATH = pathResolve(CRE_WORKFLOW_DIR, '.env');
+if (existsSync(CRE_ENV_PATH)) {
+  const envContent = readFileSync(CRE_ENV_PATH, 'utf8');
+  for (const line of envContent.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eqIdx = trimmed.indexOf('=');
+    if (eqIdx === -1) continue;
+    const key = trimmed.slice(0, eqIdx).trim();
+    const val = trimmed.slice(eqIdx + 1).trim();
+    if (!process.env[key]) process.env[key] = val;
+  }
+}
+
+// ── Load contracts .env for RPC URLs and other infra secrets ────────────
+const CONTRACTS_ENV_PATH = pathResolve(PROJECT_ROOT, 'packages/contracts/.env');
 if (existsSync(CONTRACTS_ENV_PATH)) {
   const envContent = readFileSync(CONTRACTS_ENV_PATH, 'utf8');
   for (const line of envContent.split('\n')) {
@@ -53,25 +68,38 @@ if (existsSync(CONTRACTS_ENV_PATH)) {
     if (eqIdx === -1) continue;
     const key = trimmed.slice(0, eqIdx).trim();
     const val = trimmed.slice(eqIdx + 1).trim();
-    if (!process.env[key]) process.env[key] = val;   // don't override explicit env
+    if (!process.env[key]) process.env[key] = val;   // don't override CRE .env
   }
 }
-// Map deployer key → DON_ETH_PRIVATE_KEY so CRE CLI finds it
-if (!process.env.DON_ETH_PRIVATE_KEY && process.env.SEPOLIA_PRIVATE_KEY) {
-  process.env.DON_ETH_PRIVATE_KEY = process.env.SEPOLIA_PRIVATE_KEY;
+
+// ── DON key MUST come from CRE .env (same key the frontend sends funds to) ──
+if (!process.env.DON_ETH_PRIVATE_KEY) {
+  console.error('\n╔══════════════════════════════════════════════════════════════╗');
+  console.error('║  FATAL: DON_ETH_PRIVATE_KEY not found.                      ║');
+  console.error('║                                                              ║');
+  console.error('║  The agent must use the SAME DON key the frontend sends      ║');
+  console.error('║  bid deposits to. Set it in:                                 ║');
+  console.error(`║    ${CRE_ENV_PATH}`);
+  console.error('║                                                              ║');
+  console.error('║  DO NOT fall back to the deployer/SEPOLIA_PRIVATE_KEY —      ║');
+  console.error('║  that is a different wallet and has no vault funds.           ║');
+  console.error('╚══════════════════════════════════════════════════════════════╝\n');
+  process.exit(1);
 }
-// Derive DON_WALLET_ADDRESS from the private key
-if (!process.env.DON_WALLET_ADDRESS && process.env.DON_ETH_PRIVATE_KEY) {
-  try {
-    const acct = privateKeyToAccount(process.env.DON_ETH_PRIVATE_KEY);
-    process.env.DON_WALLET_ADDRESS = acct.address;
-  } catch { /* ignore */ }
+// Derive DON_WALLET_ADDRESS from the private key (if not explicitly set)
+if (!process.env.DON_WALLET_ADDRESS) {
+  const acct = privateKeyToAccount(
+    process.env.DON_ETH_PRIVATE_KEY.startsWith('0x')
+      ? process.env.DON_ETH_PRIVATE_KEY
+      : `0x${process.env.DON_ETH_PRIVATE_KEY}`
+  );
+  process.env.DON_WALLET_ADDRESS = acct.address;
 }
 
 const RPC_URL = process.env.SEPOLIA_RPC_URL || process.env.RPC_URL_SEPOLIA || 'https://eth-sepolia.g.alchemy.com/v2/YOUR_ALCHEMY_KEY';
-const CONTRACT = (process.env.HUSH_BID_ADDRESS || '0x7fe88e9bc38085d53a11d7d311b0c48ce511efd3').toLowerCase();
+const CONTRACT = (process.env.HUSH_BID_ADDRESS || '0xf842c9a06e99f2b9fffa9d8ca10c42d7c3fc85d6').toLowerCase();
 // Also load demo .env for PINATA_JWT
-const DEMO_ENV_PATH = resolve(PROJECT_ROOT, 'apps/demo/.env');
+const DEMO_ENV_PATH = pathResolve(PROJECT_ROOT, 'apps/demo/.env');
 if (existsSync(DEMO_ENV_PATH)) {
   const envContent = readFileSync(DEMO_ENV_PATH, 'utf8');
   for (const line of envContent.split('\n')) {
@@ -88,6 +116,8 @@ if (existsSync(DEMO_ENV_PATH)) {
     if (!process.env[key]) process.env[key] = val;
   }
 }
+
+// (CRE workflow .env already loaded at top — before DON key derivation)
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
@@ -279,12 +309,13 @@ const viemClient = createPublicClient({
 
 // Wallet client for sending settlement transactions directly when CRE
 // simulation can't broadcast (writeReport is mocked in simulate mode).
-// Uses the DON key — same address as creCoordinator/owner on the contract.
+// Uses the DON key — same address that the frontend sends bid deposits to.
 let walletClient = null;
-const DON_PRIVATE_KEY = process.env.DON_ETH_PRIVATE_KEY || process.env.SEPOLIA_PRIVATE_KEY;
+const DON_PRIVATE_KEY = process.env.DON_ETH_PRIVATE_KEY;
 if (DON_PRIVATE_KEY) {
   try {
-    const donAccount = privateKeyToAccount(DON_PRIVATE_KEY);
+    const prefixedKey = DON_PRIVATE_KEY.startsWith('0x') ? DON_PRIVATE_KEY : `0x${DON_PRIVATE_KEY}`;
+    const donAccount = privateKeyToAccount(prefixedKey);
     walletClient = createWalletClient({
       account: donAccount,
       chain: activeChain,
@@ -296,20 +327,22 @@ if (DON_PRIVATE_KEY) {
 }
 
 /**
- * Execute a settleAuction call directly using the DON wallet key.
- * Used when CRE simulation identifies a winner but can't broadcast
- * (simulation mode mocks writeReport → zero tx hash, no on-chain effect).
+ * Finalize an auction on-chain by calling settleAuction via the DON wallet.
  *
- * This is the proper development-mode settlement path: the CRE workflow
- * handles all the complex logic (IPFS fetch, decryption, bid comparison,
- * PriceNormalizer) and outputs structured settlement parameters. The agent
- * then executes the actual on-chain transaction.
+ * IMPORTANT: This is purely an on-chain phase transition — settleAuction
+ * records the winner and moves the auction to COMPLETED. It does NOT
+ * transfer any tokens. All actual payment (winner bid → seller, loser
+ * refunds, asset delivery) happens privately through the Convergence
+ * Privacy Vault in the CRE workflow's settlePrivatePayments step.
+ *
+ * Used when CRE simulation identifies a winner but can't broadcast
+ * (simulation mode mocks writeReport → zero tx hash).
  *
  * Returns the tx hash on success, or throws on failure.
  */
-async function executeDirectSettlement(settlement) {
+async function finalizeOnChain(settlement) {
   if (!walletClient) {
-    throw new Error('No wallet client — DON_ETH_PRIVATE_KEY or SEPOLIA_PRIVATE_KEY not set');
+    throw new Error('No wallet client — DON_ETH_PRIVATE_KEY not set in packages/cre-workflow/.env');
   }
 
   const {
@@ -318,7 +351,7 @@ async function executeDirectSettlement(settlement) {
     destinationAddress,
   } = settlement;
 
-  log(`🔧 Executing direct settlement for auction #${auctionId} — bidIndex=${winnerBidIndex} bid=${winningBid}`);
+  log(`🔧 Finalizing auction #${auctionId} on-chain (phase transition only) — bidIndex=${winnerBidIndex} bid=${winningBid}`);
 
   const txHash = await walletClient.writeContract({
     address: CONTRACT,
@@ -341,7 +374,7 @@ async function executeDirectSettlement(settlement) {
     throw new Error(`Settlement tx ${txHash} reverted`);
   }
 
-  log(`✅ Direct settlement tx confirmed: ${txHash} (block ${receipt.blockNumber})`);
+  log(`✅ On-chain finalization confirmed: ${txHash} (block ${receipt.blockNumber})`);
   return txHash;
 }
 
@@ -703,7 +736,7 @@ async function drainQueue() {
   try {
     const result = await runSimulation(job);
 
-    // After CRE simulation, handle settlements that need direct execution
+    // After CRE simulation, finalize on-chain and verify private payments
     if (result.settlements?.length > 0) {
       await handleSettlements(result.settlements);
     }
@@ -720,15 +753,16 @@ async function drainQueue() {
 
 /**
  * After CRE simulation identifies winners, verify on-chain state and
- * execute settlements directly if needed.
+ * finalize on-chain if needed.
  *
  * The CRE simulation correctly handles all the complex logic (IPFS fetch,
  * DON-key decryption, bid comparison, PriceNormalizer fallback) but its
  * writeReport is mocked in simulate mode — no tx is actually sent.
  *
- * This function bridges the gap: it checks if the settlement actually
- * landed on-chain, and if not, sends the settleAuction tx directly
- * using the DON wallet key.
+ * This function bridges the gap: it checks if the on-chain phase actually
+ * transitioned, and if not, sends the settleAuction tx using the DON wallet
+ * key. NOTE: settleAuction only transitions the phase — NO token transfers
+ * happen on-chain. All payments go through the Convergence Privacy Vault.
  */
 async function handleSettlements(settlements) {
   for (const s of settlements) {
@@ -744,7 +778,10 @@ async function handleSettlements(settlements) {
         state.settledAuctions.add(auctionId);
         saveState();
       } else {
-        log(`⚠️ Auction #${auctionId} on-chain phase=${PHASES[phase]} but private payments failed — will retry`);
+        log(`⚠️ Auction #${auctionId} on-chain phase=${PHASES[phase]} but private vault payments failed`);
+        log(`   DON wallet: ${s.destinationAddress ? 'settlement dest=' + s.destinationAddress : 'unknown'}`);
+        log(`   Likely cause: bidder→DON private transfer failed at bid time, or seller didn't deposit auctioned asset into vault`);
+        log(`   Token: ${s.paymentToken}, Amount: ${s.winningBid}`);
         // Don't cache — agent will retry payments on next cron cycle
       }
       continue;
@@ -752,26 +789,29 @@ async function handleSettlements(settlements) {
 
     // 2. Not settled on-chain — the simulation's writeReport was mocked.
     //    Execute the settlement directly using the DON key.
-    log(`📡 Auction #${auctionId} on-chain phase=${PHASES[phase]} — simulation mode: writeReport was mocked (by design), so the settlement tx wasn't broadcast. Sending settleAuction directly via DON wallet…`);
+    log(`📡 Auction #${auctionId} on-chain phase=${PHASES[phase]} — writeReport was mocked in simulation mode. Finalizing on-chain via DON wallet (phase transition only, no token transfers)…`);
 
     try {
-      await executeDirectSettlement(s);
+      await finalizeOnChain(s);
 
       // 3. Verify the phase changed after our tx
       const newPhase = await verifyOnChainPhase(auctionId);
       if (newPhase >= 4) {
         if (s.paymentSuccess) {
-          log(`🏆 Auction #${auctionId} settlement confirmed — on-chain phase=${PHASES[newPhase]}, private payments ${s.paymentSuccess ? 'completed via Convergence API ✓' : 'pending (will retry)'}`);
+          log(`🏆 Auction #${auctionId} finalized — on-chain phase=${PHASES[newPhase]}, private vault payments ${s.paymentSuccess ? 'completed ✓' : 'pending (will retry)'}`);  
           state.settledAuctions.add(auctionId);
           saveState();
         } else {
-          log(`⚠️ Auction #${auctionId} on-chain settled (phase=${PHASES[newPhase]}) but private payments failed — will retry`);
+          log(`⚠️ Auction #${auctionId} on-chain settled (phase=${PHASES[newPhase]}) but private vault payments failed`);
+          log(`   Payment token: ${s.paymentToken}, Winning bid: ${s.winningBid}`);
+          log(`   Winner dest: ${s.destinationAddress}`);
+          log(`   Root cause: DON wallet has insufficient vault balance. Ensure bidders completed all 5 vault pipeline steps (wrap→approve→deposit→private-transfer→commit).`);
         }
       } else {
-        log(`❌ Auction #${auctionId} still phase=${PHASES[newPhase]} after direct settlement — something is wrong`);
+        log(`❌ Auction #${auctionId} still phase=${PHASES[newPhase]} after on-chain finalization — something is wrong`);
       }
     } catch (err) {
-      log(`❌ Direct settlement failed for auction #${auctionId}: ${err.message}`);
+      log(`❌ On-chain finalization failed for auction #${auctionId}: ${err.message}`);
       // Don't mark as settled — will retry on next cron cycle
     }
   }
@@ -779,11 +819,28 @@ async function handleSettlements(settlements) {
 
 function runSimulation({ label, triggerIndex, evmTxHash, evmEventIndex }) {
   return new Promise((resolve, reject) => {
+    // Resolve ${VAR} placeholders in config.staging.json → config.staging.resolved.json
+    // CRE simulation reads config values literally (no env substitution).
+    const configPath = pathResolve(CRE_WORKFLOW_DIR, 'hush-bid/config.staging.json');
+    const resolvedPath = pathResolve(CRE_WORKFLOW_DIR, 'hush-bid/config.staging.resolved.json');
+    try {
+      let configText = readFileSync(configPath, 'utf8');
+      configText = configText.replace(/\$\{([^}]+)\}/g, (_, varName) => {
+        const val = process.env[varName];
+        if (!val) log(`⚠️  Warning: env var ${varName} not set for config substitution`);
+        return val || '';
+      });
+      writeFileSync(resolvedPath, configText, 'utf8');
+    } catch (err) {
+      log(`❌ Failed to resolve config secrets: ${err.message}`);
+      return reject(err);
+    }
+
     const creArgs = [
       'workflow', 'simulate', './hush-bid',
       '--non-interactive',
       '--trigger-index', String(triggerIndex),
-      '--target', 'staging-settings',
+      '--target', 'staging-simulate',
     ];
     if (evmTxHash) {
       creArgs.push('--evm-tx-hash', evmTxHash, '--evm-event-index', String(evmEventIndex));
@@ -959,6 +1016,7 @@ async function main() {
   console.log('║        🤫 HushBid CRE Agent (LLM-Powered)                  ║');
   console.log('╠══════════════════════════════════════════════════════════════╣');
   console.log(`║  Contract:  ${CONTRACT.slice(0, 20)}…${CONTRACT.slice(-6)}                    ║`);
+  console.log(`║  DON wallet:${(process.env.DON_WALLET_ADDRESS || 'MISSING').padEnd(48)}║`);
   console.log(`║  Model:     ${(GROQ_API_KEY ? GROQ_MODEL : 'fallback (no key)').padEnd(38)}       ║`);
   console.log(`║  Interval:  ${String(BASE_INTERVAL_S).padEnd(5)}s idle (deadline-aware, auto-wakes)       ║`);
   console.log(`║  Broadcast: ${BROADCAST ? 'YES (real txs)' : 'NO (dry sim) '}                              ║`);

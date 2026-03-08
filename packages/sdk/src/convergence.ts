@@ -371,7 +371,12 @@ export async function privateTransfer(
   });
 
   const data = (await res.json()) as { transaction_id?: string; error?: string };
+  console.log(
+    `[privateTransfer] ${from} → ${to} | token=${token} amount=${amount.toString()} | HTTP ${res.status}`,
+    JSON.stringify(data),
+  );
   if (!res.ok) {
+    console.error(`[privateTransfer] FAILED:`, data.error);
     return { success: false, error: data.error || `HTTP ${res.status}` };
   }
   return { success: true, transactionId: data.transaction_id };

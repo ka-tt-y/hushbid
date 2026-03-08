@@ -7,7 +7,7 @@ import { StepProgress } from './StepProgress';
 import { generateSalt, generateCommitment, storeBidLocally } from '../lib/utils';
 import { isPinataConfigured } from '../lib/ipfs-backup';
 import { isCreConfigured, submitBidToCre, encryptForDon, PrivacyLevel, HUSH_BID_ABI } from '@hushbid/sdk';
-import { privateTransfer, createConvergenceSigner, generateShieldedAddress, approveVault, depositToVault, checkDepositAllowed } from '@hushbid/sdk';
+import { privateTransfer, createConvergenceSigner, generateShieldedAddress, approveVault, depositToVault, checkDepositAllowed, getVaultBalances } from '@hushbid/sdk';
 import { getTokenAddress, type SupportedChain } from '@hushbid/sdk';
 import { getCreConfig, getConvergenceAddresses } from '../config/addresses';
 import { useTokenPrices } from '../hooks/useTokenPrices';
@@ -125,6 +125,29 @@ export function BidModal({ auctionId, biddingEnd, privacyLevel, worldIdRequired,
     } catch (e) {
       console.warn('hasBid pre-check failed, proceeding:', e);
     }
+
+    // World ID nullifier duplicate check before hitting the contract
+    if (worldIdRequired && worldIdProof) {
+      try {
+        const { getContractAddresses } = await import('../config/addresses');
+        const { createPublicClient, http } = await import('viem');
+        const rpcUrl = import.meta.env.VITE_RPC_URL_SEPOLIA;
+        const { hushBid } = getContractAddresses();
+        const pc = createPublicClient({ transport: http(rpcUrl) });
+        const nullifierUsed = await pc.readContract({
+          address: hushBid,
+          abi: HUSH_BID_ABI,
+          functionName: 'auctionNullifierHashes',
+          args: [BigInt(auctionId), BigInt(worldIdProof.nullifier_hash)],
+        });
+        if (nullifierUsed) {
+          setError('Your World ID has already been used to bid on this auction. Each verified human can only bid once per auction.');
+          return;
+        }
+      } catch (e) {
+        console.warn('nullifier pre-check failed, proceeding:', e);
+      }
+    }
     
     try {
       setIsSubmitting(true);
@@ -230,6 +253,30 @@ export function BidModal({ auctionId, biddingEnd, privacyLevel, worldIdRequired,
       if (!transferResult.success) {
         throw new Error(`Vault transfer failed: ${transferResult.error}`);
       }
+
+      // Verify the bidder's vault balance decreased (confirms funds left their account)
+      try {
+        const verifySigner = createConvergenceSigner(
+          (window as any).ethereum,
+          address,
+        );
+        const balances = await getVaultBalances(address, verifySigner, {
+          apiEndpoint: convergence.apiEndpoint,
+          vaultAddress: convergence.vault,
+        });
+        const tokenBalance = balances.find(
+          (b) => b.token.toLowerCase() === vaultTokenAddress.toLowerCase()
+        );
+        const remaining = tokenBalance ? BigInt(tokenBalance.amount) : 0n;
+        console.log(`Bidder vault balance after transfer: ${remaining.toString()} (deposited ${bidAmount.toString()}, expect ~0 remaining)`);
+        // If the bidder still holds the full amount, the private transfer to DON may not have gone through
+        if (remaining >= bidAmount) {
+          console.warn('⚠️ Bidder vault balance did not decrease — private transfer to DON may have failed');
+        }
+      } catch (e) {
+        console.warn('Vault balance verification failed (non-blocking):', e);
+      }
+
       setVaultTxId(transferResult.transactionId || 'confirmed');
       if (transferResult.transactionId) {
         setTxLog(prev => [...prev, { label: 'Private transfer to DON', hash: transferResult.transactionId!, isOnChain: false }]);
@@ -520,8 +567,8 @@ export function BidModal({ auctionId, biddingEnd, privacyLevel, worldIdRequired,
                           {tx.hash.slice(0, 10)}…{tx.hash.slice(-6)}
                         </a>
                       ) : (
-                        <span className="font-mono text-emerald-400" title="Convergence vault internal transfer (private)">
-                          🔒 {tx.hash.slice(0, 12)}…
+                        <span className="font-mono text-emerald-400 break-all text-right" title="Convergence vault internal transfer (private)">
+                          {tx.hash}
                         </span>
                       )}
                     </div>

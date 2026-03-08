@@ -134,6 +134,28 @@ export function AuctionCard({ auction, onBid, currentUser }: AuctionCardProps) {
           )}
         </div>
 
+        {/* Auctioned Token */}
+        <div className="flex items-center gap-2 text-xs">
+          <span className="text-zinc-600">Token:</span>
+          <a
+            href={`https://sepolia.etherscan.io/address/${auction.assetContract}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-mono text-blue-400 hover:text-blue-300 transition-colors"
+          >
+            {shortenAddress(auction.assetContract as `0x${string}`)}
+          </a>
+          <span className="text-zinc-600">×</span>
+          <span className="font-mono text-zinc-300">
+            {(() => {
+              const eth = parseFloat(formatEther(auction.tokenAmount));
+              return eth < 0.0001
+                ? `${auction.tokenAmount.toString()} wei`
+                : `${eth.toFixed(4)}`;
+            })()}
+          </span>
+        </div>
+
         {/* Reserve + Bids */}
         <div className="flex items-center justify-between">
           <div>

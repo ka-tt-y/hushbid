@@ -79,7 +79,6 @@ export interface ChainConfig {
   isPrimary: boolean;
   contracts: {
     hushBid?: string;
-    worldIdVerifier?: string;
     convergenceVault?: string;
   };
 }
@@ -121,7 +120,11 @@ export interface CreConfig {
 }
 
 /**
- * World ID v3 proof
+ * World ID proof for on-chain submission.
+ *
+ * Orb proofs (root != 0): verified on-chain via WorldIDRouter.verifyProof
+ * Device proofs (root == 0): verified off-chain via World ID cloud API;
+ *   the contract only tracks nullifierHash for sybil resistance.
  */
 export interface WorldIdProof {
   root: bigint;

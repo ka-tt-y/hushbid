@@ -21,43 +21,7 @@ Traditional auctions solve this with sealed envelopes. HushBid brings that to th
 
 HushBid is a sealed-bid auction protocol where bids are **encrypted, committed on-chain, and only revealed inside a Chainlink CRE Trusted Execution Environment (TEE)**. The Decentralized Oracle Network (DON) decrypts bids, determines the winner, and settles the auction — all without any single party ever seeing the raw bid data.
 
-### How It Works
 
-```
-┌─────────────┐     ┌─────────────┐     ┌─────────────────────────────┐
-│   Bidder A   │     │   Bidder B   │     │   Bidder C (other chain)    │
-│  Base Sepolia│     │ Base Sepolia │     │   Arbitrum Sepolia          │
-└──────┬───────┘     └──────┬───────┘     └─────────────┬───────────────┘
-       │                    │                           │
-       │ commit(hash)       │ commit(hash)              │ CCIP cross-chain bid
-       │                    │                           │
-       ▼                    ▼                           ▼
-┌──────────────────────────────────────────────────────────────────────┐
-│                      HushBid Smart Contract                         │
-│                         (Base Sepolia)                               │
-│  • Stores only commitment hashes — no amounts visible on-chain      │
-│  • Accepts bids in ETH, WETH, USDC, DAI, LINK, WBTC, USDT          │
-│  • Optional World ID verification (one-person-one-bid)              │
-└──────────────────────────┬───────────────────────────────────────────┘
-                           │
-                           │ BidCommitted events
-                           ▼
-┌──────────────────────────────────────────────────────────────────────┐
-│                    Chainlink CRE Workflow (TEE)                      │
-│                                                                      │
-│  1. Detects auctions ready for settlement (cron + event triggers)   │
-│  2. Fetches encrypted bid metadata from IPFS (ConfidentialHTTP)     │
-│  3. Decrypts bids using ECIES inside the TEE — never exposed       │
-│  4. Normalizes multi-token bids to USD via Chainlink Data Feeds     │
-│  5. Determines the winner through DON consensus                     │
-│  6. Submits DON-signed settlement transaction on-chain              │
-│  7. Optionally transfers the asset atomically (DON-direct-delivery) │
-└──────────────────────────────────────────────────────────────────────┘
-```
-
-**The result:** A fair auction where the true market price emerges, because every bidder submits what they genuinely believe the asset is worth — not a reaction to what others bid.
-
----
 
 ## Chainlink Products Used
 
@@ -75,10 +39,6 @@ CRE is the backbone of HushBid. The entire settlement process runs inside the DO
 | **Consensus & Aggregation** | Multiple DON nodes independently decrypt and evaluate bids, then reach consensus on the winner |
 | **Report / WriteReport** | Submits the DON-signed settlement transaction on-chain with full cryptographic proof |
 
-### 🌉 Chainlink CCIP (Cross-Chain Interoperability)
-
-Bidders don't need to be on the same chain as the auction. HushBid uses CCIP to forward bids from **Sepolia** and **Arbitrum Sepolia** to the auction contract on **Base Sepolia**. The `CrossChainBidSender` encodes the commitment hash and IPFS CID, sends them via CCIP's `IRouterClient`, and the `CrossChainBidReceiver` on Base records the bid as if it were local.
-
 ### 📊 Chainlink Data Feeds
 
 The `PriceNormalizer` contract uses Chainlink Data Feeds (ETH/USD, USDC/USD, DAI/USD) to normalize bids across different tokens to a common USD value. This means a bid of 1 ETH and a bid of 3,500 USDC are directly comparable — the DON picks the highest-value bid regardless of token denomination.
@@ -90,23 +50,16 @@ The `PriceNormalizer` contract uses Chainlink Data Feeds (ETH/USD, USDC/USD, DAI
 ### 🔒 Three Privacy Levels
 Auction creators choose their privacy model:
 - **Full Private** — Winner and amount are never publicly revealed. Only the winner knows they won.
-- **Price Only** — The winning amount is revealed, but the winner's identity stays private.
 - **Auditable** — A designated auditor address can inspect all bid details for compliance.
 
-### 🎭 Stealth Addresses (ERC-5564)
-Winners can receive assets at a stealth address — a one-time address derived from their keys that can't be linked to their main wallet. Combined with EIP-712 gasless claims (`claimAssetFor`), the winner can claim without revealing their identity on-chain.
+### 🎭 Shielded Addresses (ERC-5564)
+Winners can receive assets at a shielded address — a one-time address derived from their keys that can't be linked to their main wallet. All participants can claim (get refunded) without revealing their identity on-chain.
 
-### ⚡ DON-Direct-Delivery
-When the CRE workflow settles an auction, it can transfer the escrowed asset directly to the winner in the same transaction — no separate claim step needed. The settlement and asset transfer happen atomically.
-
-### 🌐 Cross-Chain Bidding
-Bid from any supported chain. Currently supports:
-- **Base Sepolia** (primary auction chain)
-- **Sepolia** → Base Sepolia via CCIP
-- **Arbitrum Sepolia** → Base Sepolia via CCIP
+### 🌐 Single-Chain Deployment
+Currently deployed on **Ethereum Sepolia** with all contracts and Convergence Vault on the same chain. The contract architecture will support future cross-chain expansion via Chainlink CCIP.
 
 ### 💱 Multi-Token Bidding
-Bid in any of 7 supported tokens: **ETH, WETH, USDC, USDT, DAI, LINK, WBTC**. All bids are normalized to USD using Chainlink Data Feeds so they're directly comparable.
+Bid in any of multiple supported ERC20 tokens including **, WETH, CUSTOM TOKEN**. All bids are normalized to USD using Chainlink Data Feeds so they're directly comparable.
 
 ### 🆔 World ID Sybil Resistance
 Auction creators can require World ID verification, ensuring one-person-one-bid. Prevents sock puppet attacks where a single entity places multiple bids to manipulate the auction.
@@ -136,44 +89,9 @@ Bid payments flow through the Convergence Privacy Vault — a shielded ERC-20 tr
 
 ### 🖼️ Multi-Asset Support
 Auction any type of on-chain asset:
-- **ERC-721** — NFTs
 - **ERC-20** — Fungible tokens
-- **ERC-1155** — Semi-fungible tokens
-- **None** — Pure price discovery (no asset escrowed)
 
 ---
-
-## Project Structure
-
-```
-hushmarket/
-├── packages/
-│   ├── contracts/          # Solidity smart contracts (Hardhat 3)
-│   │   ├── HushBid.sol              — Core auction contract
-│   │   ├── PriceNormalizer.sol       — Chainlink Data Feeds integration
-│   │   ├── CrossChainBidSender.sol   — CCIP bid forwarding
-│   │   ├── CrossChainBidReceiver.sol — CCIP bid receiving
-│   │   └── interfaces/IBidTypes.sol  — Shared type definitions
-│   │
-│   ├── sdk/                # TypeScript SDK (@hushbid/sdk)
-│   │   ├── client.ts       — HushBidClient for all contract interactions
-│   │   ├── crypto.ts       — Commitment generation, ECIES encryption
-│   │   ├── stealth.ts      — ERC-5564 stealth address implementation
-│   │   ├── tokens.ts       — Supported tokens + Chainlink feed addresses
-│   │   └── ipfs.ts         — CID ↔ bytes32 conversion for on-chain storage
-│   │
-│   └── cre-workflow/       # Chainlink CRE Workflow
-│       └── sealed-bid-auction/
-│           ├── main.ts     — Full CRE workflow (cron + event triggers)
-│           ├── workflow.yaml
-│           └── config.*.json
-│
-└── apps/
-    └── demo/               # React + Vite demo frontend
-        ├── UserDashboard   — Browse auctions, place bids, reveal, claim
-        ├── AdminDashboard  — Create auctions, manage settings
-        └── HistoryPage     — View past auction results
-```
 
 ## Tech Stack
 
@@ -185,16 +103,16 @@ hushmarket/
 | Frontend | React, Vite, wagmi, RainbowKit |
 | Identity | World ID (Worldcoin) |
 | Storage | IPFS (Pinata) for encrypted bid metadata |
-| Cryptography | ECIES (secp256r1/P-256), ERC-5564 stealth addresses, EIP-712 typed signatures |
+| Cryptography | ECIES (secp256r1/P-256), keccak256-CTR, EIP-712 typed signatures |
 
-## Deployed Contracts (Base Sepolia)
+## Deployed Contracts (Ethereum Sepolia)
 
-| Contract | Description |
-|---|---|
-| `HushBid` | Core sealed-bid auction contract |
-| `PriceNormalizer` | Multi-token price normalization via Chainlink Data Feeds |
-| `CrossChainBidReceiver` | Receives CCIP cross-chain bids |
-| `MockNFT` | Test ERC-721 for demo auctions |
+| Contract | Address | Description |
+|---|---|---|
+| `HushBid` | `0xf842c9a06e99f2b9fffa9d8ca10c42d7c3fc85d6` | Core sealed-bid auction contract |
+| `PriceNormalizer` | — | Multi-token price normalization via Chainlink Data Feeds |
+| Convergence Vault | `0xE588a6c73933BFD66Af9b4A07d48bcE59c0D2d13` | Shielded ERC-20 transfer layer |
+| WorldID Router | `0x469449f251692E0779667583026b5A1E99B72157` | World ID on-chain verification (Orb) |
 
 ## Quick Start
 
@@ -202,11 +120,8 @@ hushmarket/
 # Install dependencies
 npm install
 
-# Compile contracts
-npm run compile
-
-# Build SDK
-cd packages/sdk && npx tsup
+# Build SDK (required before running the demo)
+cd packages/sdk && npm run build && cd ../..
 
 # Run demo app
 npm run dev:demo
@@ -218,13 +133,6 @@ npm run dev:demo
 2. **Place a bid** — Browse auctions on the main page. Your bid is encrypted and committed on-chain. Nobody can see it.
 3. **Wait for settlement** — The CRE workflow automatically detects when bidding ends, decrypts all bids inside the TEE, and settles the auction
 4. **Claim your asset** — If you won, claim the escrowed asset (or receive it automatically via DON-direct-delivery)
-
----
-
-## License
-
-MIT
-
 ---
 
 *Built for the Chainlink CRE Convergence Hackathon*

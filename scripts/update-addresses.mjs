@@ -16,11 +16,10 @@
  * Usage:
  *   node scripts/update-addresses.mjs \
  *     --hushBid 0xNEW_HUSHBID \
- *     --priceNormalizer 0xNEW_PRICE \
- *     --mockNFT 0xNEW_NFT
+ *     --priceNormalizer 0xNEW_PRICE
  *
  * Or via env vars:
- *   HUSH_BID_ADDRESS=0x... PRICE_NORMALIZER=0x... MOCK_NFT=0x... node scripts/update-addresses.mjs
+ *   HUSH_BID_ADDRESS=0x... PRICE_NORMALIZER=0x... node scripts/update-addresses.mjs
  */
 
 import fs from 'fs';
@@ -49,20 +48,18 @@ const cli = parseArgs();
 const addresses = {
   hushBid:         cli.hushBid         || process.env.HUSH_BID_ADDRESS    || '',
   priceNormalizer: cli.priceNormalizer  || process.env.PRICE_NORMALIZER    || '',
-  mockNFT:         cli.mockNFT         || process.env.MOCK_NFT            || '',
 };
 
 if (!addresses.hushBid) {
   console.error('❌ Missing --hushBid or HUSH_BID_ADDRESS env var');
   console.error('\nUsage:');
-  console.error('  node scripts/update-addresses.mjs --hushBid 0x... --priceNormalizer 0x... --mockNFT 0x...');
+  console.error('  node scripts/update-addresses.mjs --hushBid 0x... --priceNormalizer 0x...');
   process.exit(1);
 }
 
 console.log('\n🔄 Post-Deploy Address Updater\n');
 console.log(`  HushBid:         ${addresses.hushBid}`);
 console.log(`  PriceNormalizer: ${addresses.priceNormalizer || '(unchanged)'}`);
-console.log(`  MockNFT:         ${addresses.mockNFT || '(unchanged)'}`);
 console.log();
 
 let updated = 0;

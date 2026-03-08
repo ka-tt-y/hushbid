@@ -176,6 +176,16 @@ export const HUSH_BID_ABI = [
     outputs: [{ name: "", type: "uint256" }],
   },
   {
+    type: "function",
+    name: "auctionNullifierHashes",
+    stateMutability: "view",
+    inputs: [
+      { name: "auctionId", type: "uint256" },
+      { name: "nullifierHash", type: "uint256" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
+  },
+  {
     type: "event",
     name: "AuctionCreated",
     inputs: [
@@ -217,100 +227,6 @@ export const HUSH_BID_ABI = [
     type: "event",
     name: "AuctionCancelled",
     inputs: [{ name: "auctionId", type: "uint256", indexed: true }],
-  },
-] as const;
-
-export const PRICE_NORMALIZER_ABI = [
-  {
-    type: "function",
-    name: "normalizeToUsd",
-    stateMutability: "view",
-    inputs: [
-      { name: "token", type: "address" },
-      { name: "amount", type: "uint256" },
-    ],
-    outputs: [{ name: "usdValue", type: "uint256" }],
-  },
-  {
-    type: "function",
-    name: "compareBids",
-    stateMutability: "view",
-    inputs: [
-      { name: "tokenA", type: "address" },
-      { name: "amountA", type: "uint256" },
-      { name: "tokenB", type: "address" },
-      { name: "amountB", type: "uint256" },
-    ],
-    outputs: [
-      { name: "aIsHigher", type: "bool" },
-      { name: "aUsd", type: "uint256" },
-      { name: "bUsd", type: "uint256" },
-    ],
-  },
-  {
-    type: "function",
-    name: "findHighestBid",
-    stateMutability: "view",
-    inputs: [
-      { name: "tokens", type: "address[]" },
-      { name: "amounts", type: "uint256[]" },
-    ],
-    outputs: [
-      { name: "winnerIndex", type: "uint256" },
-      { name: "highestUsd", type: "uint256" },
-    ],
-  },
-  {
-    type: "function",
-    name: "getAllPrices",
-    stateMutability: "view",
-    inputs: [],
-    outputs: [
-      { name: "ethUsd", type: "uint256" },
-      { name: "usdcUsd", type: "uint256" },
-      { name: "daiUsd", type: "uint256" },
-    ],
-  },
-  {
-    type: "function",
-    name: "getEthUsdPrice",
-    stateMutability: "view",
-    inputs: [],
-    outputs: [{ name: "price", type: "uint256" }],
-  },
-  {
-    type: "function",
-    name: "getUsdcUsdPrice",
-    stateMutability: "view",
-    inputs: [],
-    outputs: [{ name: "price", type: "uint256" }],
-  },
-  {
-    type: "function",
-    name: "getDaiUsdPrice",
-    stateMutability: "view",
-    inputs: [],
-    outputs: [{ name: "price", type: "uint256" }],
-  },
-] as const;
-
-export const MOCK_NFT_ABI = [
-  {
-    type: "function",
-    name: "mint",
-    stateMutability: "nonpayable",
-    inputs: [{ name: "to", type: "address" }],
-    outputs: [{ name: "tokenId", type: "uint256" }],
-  },
-  {
-    type: "function",
-    name: "approve",
-    stateMutability: "nonpayable",
-    inputs: [
-      { name: "to", type: "address" },
-      { name: "tokenId", type: "uint256" },
-    ],
-    outputs: [],
   },
 ] as const;
 
@@ -400,37 +316,6 @@ export async function submitBidToCre(
       success: false,
       error: error instanceof Error ? error.message : "Network error",
     };
-  }
-}
-
-/**
- * Get auction info from CRE (cached state)
- */
-export async function getAuctionFromCre(
-  config: CreConfig,
-  auctionId: string
-): Promise<{
-  phase: string;
-  bidCount: number;
-  biddingEnd: number;
-  revealEnd: number;
-} | null> {
-  if (!config.endpoint) {
-    return null;
-  }
-
-  try {
-    const response = await fetch(
-      `${config.endpoint}/api/v1/auction/${auctionId}`
-    );
-
-    if (!response.ok) {
-      return null;
-    }
-
-    return (await response.json()) as { phase: string; bidCount: number; biddingEnd: number; revealEnd: number };
-  } catch {
-    return null;
   }
 }
 
@@ -742,9 +627,9 @@ export class HushBidClient {
    * and decrypt the bid amount using its private key. No plaintext bid amounts
    * ever touch the blockchain or any intermediary server.
    *
-   * **Stealth address support**: Pass `destinationAddress` to receive the
-   * auction asset at a stealth address (generated via `computeStealthAddress()`).
-   * The CRE uses this for DON-direct-delivery, sending the asset to the stealth
+   * **shielded address support**: Pass `destinationAddress` to receive the
+   * auction asset at a shielded address (generated via `computeshieldedAddress()`).
+   * The CRE uses this for DON-direct-delivery, sending the asset to the shielded
    * address in the settlement tx without ever linking it to the bidder on-chain.
    *
    * @param params.auctionId — Auction to bid on
@@ -752,7 +637,7 @@ export class HushBidClient {
    * @param params.paymentToken — ERC20 token address (or zeroAddress for ETH)
    * @param params.pinataJwt — Pinata JWT for IPFS pinning
    * @param params.worldIdProof — Optional World ID proof
-   * @param params.destinationAddress — Optional stealth/delivery address for the asset.
+   * @param params.destinationAddress — Optional shielded/delivery address for the asset.
    *        If omitted, the bidder's wallet address is used as the delivery target.
    * @returns Commitment hash, salt (save to reveal later!), IPFS CID, and tx hash
    *
@@ -763,7 +648,7 @@ export class HushBidClient {
    *   amount: parseEther("1.5"),
    *   paymentToken: zeroAddress,
    *   pinataJwt: process.env.PINATA_JWT!,
-   *   destinationAddress: stealthAddress, // Asset delivered here
+   *   destinationAddress: shieldedAddress, // Asset delivered here
    * });
    * ```
    */

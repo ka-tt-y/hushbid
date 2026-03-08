@@ -3,4 +3,3 @@
 
 export { HushBidABI } from './HushBid';
 export { PriceNormalizerABI } from './PriceNormalizer';
-export { MockNFTABI } from './MockNFT';

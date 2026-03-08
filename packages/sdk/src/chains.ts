@@ -13,8 +13,7 @@ export const CHAIN_CONFIGS: Record<SupportedChain, ChainConfig> = {
     rpcUrl: "https://eth-sepolia.g.alchemy.com/v2/YOUR_ALCHEMY_KEY",
     isPrimary: true,
     contracts: {
-      hushBid: "0x7fe88e9bc38085d53a11d7d311b0c48ce511efd3",
-      worldIdVerifier: "",
+      hushBid: "0xf842c9a06e99f2b9fffa9d8ca10c42d7c3fc85d6",
       convergenceVault: "0xE588a6c73933BFD66Af9b4A07d48bcE59c0D2d13",
     },
   },

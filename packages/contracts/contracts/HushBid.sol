@@ -178,15 +178,24 @@ contract HushBid is IBidTypes, ReentrancyGuard, Ownable {
         if (hasBid[auctionId][msg.sender]) revert AlreadyBid();
 
         if (auction.worldIdRequired) {
+            if (nullifierHash == 0) revert InvalidCommitment();
             if (auctionNullifierHashes[auctionId][nullifierHash]) revert WorldIdAlreadyUsed();
-            worldIdVerifier.verifyProof(
-                root,
-                groupId,
-                uint256(keccak256(abi.encodePacked(msg.sender))),
-                nullifierHash,
-                externalNullifierHash,
-                zeroKnowledgeProof
-            );
+
+            // root != 0 → Orb proof: verify on-chain via WorldIDRouter
+            // root == 0 → Device proof: verified off-chain via World ID cloud API;
+            //             the contract enforces nullifier uniqueness only.
+            //             See: https://docs.world.org/world-id/idkit/onchain-verification
+            if (root != 0) {
+                worldIdVerifier.verifyProof(
+                    root,
+                    groupId,
+                    uint256(keccak256(abi.encodePacked(msg.sender))),
+                    nullifierHash,
+                    externalNullifierHash,
+                    zeroKnowledgeProof
+                );
+            }
+
             auctionNullifierHashes[auctionId][nullifierHash] = true;
         }
 
